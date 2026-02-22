@@ -134,11 +134,15 @@ export const Editor: React.FC<EditorProps> = ({
               dir="rtl"
               value={title}
               onChange={(e) => onTitleChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
               placeholder="اكتب عنوان الخبر هنا..."
               className="flex-1 text-4xl font-black bg-transparent border-none outline-none placeholder:text-slate-300 text-slate-800 caret-blue-600 py-2"
             />
             <button 
-              onClick={onSendToTelegram}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSendToTelegram();
+              }}
               className="w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg shadow-blue-200 flex items-center justify-center transition-all hover:scale-105 active:scale-95 group"
               title="إرسال للمراسل"
             >
