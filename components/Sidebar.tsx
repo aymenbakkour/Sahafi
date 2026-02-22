@@ -134,7 +134,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span className="text-[9px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{art.date}</span>
                     <button 
                       onClick={(e) => { e.stopPropagation(); onDeleteArticle(art.id); }}
-                      className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                      className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                      title="حذف المسودة"
                     >
                       <Trash2 size={14} />
                     </button>

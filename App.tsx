@@ -14,10 +14,10 @@ import { SettingsModal } from './components/SettingsModal';
 
 const App: React.FC = () => {
   // State: Data
-  const [agencies, setAgencies] = useState<Agency[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [agencies, setAgencies] = useState<Agency[]>(() => storageService.load(storageService.KEYS.AGENCIES, INITIAL_AGENCIES));
+  const [categories, setCategories] = useState<Category[]>(() => storageService.load(storageService.KEYS.CATEGORIES, INITIAL_CATEGORIES));
+  const [articles, setArticles] = useState<Article[]>(() => storageService.load(storageService.KEYS.ARTICLES, []));
+  const [settings, setSettings] = useState<AppSettings>(() => storageService.load(storageService.KEYS.SETTINGS, DEFAULT_SETTINGS));
   
   // State: UI & Selection
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>('1');
@@ -40,30 +40,17 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [wordCount, setWordCount] = useState(0);
 
-  // --- Initial Load ---
-  useEffect(() => {
-    const loadedAgencies = storageService.load(storageService.KEYS.AGENCIES, INITIAL_AGENCIES);
-    const loadedCategories = storageService.load(storageService.KEYS.CATEGORIES, INITIAL_CATEGORIES);
-    const loadedArticles = storageService.load(storageService.KEYS.ARTICLES, []);
-    const loadedSettings = storageService.load(storageService.KEYS.SETTINGS, DEFAULT_SETTINGS);
-
-    setAgencies(loadedAgencies);
-    setCategories(loadedCategories);
-    setArticles(loadedArticles);
-    setSettings(loadedSettings);
-  }, []);
-
   // --- Auto Save & Persistence ---
   useEffect(() => {
-    if (agencies.length) storageService.save(storageService.KEYS.AGENCIES, agencies);
+    storageService.save(storageService.KEYS.AGENCIES, agencies);
   }, [agencies]);
 
   useEffect(() => {
-    if (categories.length) storageService.save(storageService.KEYS.CATEGORIES, categories);
+    storageService.save(storageService.KEYS.CATEGORIES, categories);
   }, [categories]);
 
   useEffect(() => {
-    if (articles.length) storageService.save(storageService.KEYS.ARTICLES, articles);
+    storageService.save(storageService.KEYS.ARTICLES, articles);
   }, [articles]);
 
   useEffect(() => {
