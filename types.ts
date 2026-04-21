@@ -23,6 +23,7 @@ export interface RssSource {
   id: string;
   name: string;
   url: string;
+  category?: string;
 }
 
 export interface RssItem {
@@ -40,8 +41,6 @@ export interface ChatMessage {
 
 export interface AppSettings {
   authorName: string;
-  tgToken: string;
-  tgChatId: string;
   rssSources: RssSource[];
 }
 

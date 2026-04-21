@@ -4,61 +4,104 @@ export const rssService = {
   fetchFeeds: async (sources: RssSource[]): Promise<RssItem[]> => {
     const allItems: RssItem[] = [];
     
-    const promises = sources.map(async (source) => {
-      try {
-        // Use a cache buster to prevent stale data
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(source.url)}&t=${Date.now()}`;
-        const response = await fetch(proxyUrl);
-        
-        if (!response.ok) {
-          throw new Error(`Proxy error: ${response.status}`);
-        }
+    const fetchWithProxy = async (url: string, proxyIndex = 0): Promise<string | null> => {
+      const proxies = [
+        (u: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}&t=${Date.now()}`, // Force no cache for now to debug
+        (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+        (u: string) => `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(u)}`,
+      ];
 
-        const data = await response.json();
+      if (proxyIndex >= proxies.length) return null;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
         
-        if (!data.contents) {
-            throw new Error('No content returned from proxy');
+        const targetUrl = proxies[proxyIndex](url);
+        const response = await fetch(targetUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error("Status " + response.status);
+
+        if (proxyIndex === 0) {
+          const data = await response.json();
+          return data.contents || null;
+        } else {
+          return await response.text();
         }
+      } catch (e) {
+        console.warn(`Proxy ${proxyIndex} failed for ${url}:`, e);
+        return fetchWithProxy(url, proxyIndex + 1);
+      }
+    };
+
+    const fetchSource = async (source: RssSource) => {
+      try {
+        const contents = await fetchWithProxy(source.url);
+        if (!contents) return [];
 
         const parser = new DOMParser();
-        const xml = parser.parseFromString(data.contents, "text/xml");
+        const doc = parser.parseFromString(contents, "text/xml");
         
-        // Check for XML parsing errors
-        const parseError = xml.querySelector('parsererror');
-        if (parseError) {
-          throw new Error('XML Parsing Error');
+        const isError = doc.querySelector('parsererror');
+        if (isError) {
+          const htmlDoc = parser.parseFromString(contents, "text/html");
+          return processDoc(htmlDoc, source.name);
         }
 
-        // Try 'item' (RSS 2.0) first, then 'entry' (Atom)
-        let items = xml.querySelectorAll("item");
-        if (items.length === 0) {
-            items = xml.querySelectorAll("entry");
-        }
-        
-        items.forEach((item, index) => {
-          if (index < 5) { // Limit to 5 per source
-            // Handle differences between RSS and Atom
-            const title = item.querySelector("title")?.textContent || "No Title";
-            
-            // Link might be a text content of <link> or href attribute in <link href="..." />
-            let link = item.querySelector("link")?.textContent;
-            if (!link) {
-                link = item.querySelector("link")?.getAttribute("href") || "";
-            }
-
-            allItems.push({
-              title: title.trim(),
-              source: source.name,
-              link: link?.trim() || ""
-            });
-          }
-        });
+        return processDoc(doc, source.name);
       } catch (error) {
-        console.warn(`Failed to fetch RSS from ${source.name}:`, error);
+        return [];
       }
+    };
+
+    const processDoc = (doc: Document | Element, sourceName: string): RssItem[] => {
+      const sourceItems: RssItem[] = [];
+      
+      // Use getElementsByTagName for better cross-format/namespace compatibility
+      let items = Array.from(doc.getElementsByTagName("item"));
+      if (items.length === 0) items = Array.from(doc.getElementsByTagName("entry"));
+      
+      // Fallback to querySelectorAll if still empty
+      if (items.length === 0) {
+        items = Array.from(doc.querySelectorAll("item, entry, ITEM, ENTRY"));
+      }
+
+      items.slice(0, 10).forEach((item) => {
+        const title = item.getElementsByTagName("title")[0]?.textContent || 
+                      item.querySelector("title")?.textContent || 
+                      "بدون عنوان";
+        
+        let link = "";
+        const linkTags = item.getElementsByTagName("link");
+        
+        if (linkTags.length > 0) {
+          link = linkTags[0].textContent || linkTags[0].getAttribute("href") || "";
+        }
+
+        if (!link || link.trim() === "") {
+          link = item.querySelector("link")?.textContent || 
+                 item.querySelector("link")?.getAttribute("href") || 
+                 item.querySelector("guid")?.textContent ||
+                 "";
+        }
+
+        if (title.trim()) {
+          sourceItems.push({
+            title: title.trim(),
+            source: sourceName,
+            link: link.trim()
+          });
+        }
+      });
+      return sourceItems;
+    };
+
+    const results = await Promise.all(sources.map(fetchSource));
+    results.forEach(result => {
+      if (result) allItems.push(...result);
     });
 
-    await Promise.all(promises);
     return allItems;
   }
 };
